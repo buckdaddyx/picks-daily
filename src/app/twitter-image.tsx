@@ -4,7 +4,7 @@ import OpengraphImage, {
   contentType as ogContentType,
 } from "./opengraph-image";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const alt = ogAlt;
 export const size = ogSize;
 export const contentType = ogContentType;

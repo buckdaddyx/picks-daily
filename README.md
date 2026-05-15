@@ -57,37 +57,41 @@ public/
 
 ## Adding a new daily play
 
-You have two paths:
-
-**Path A — let the pipeline do the work.** Drop the source highlight clip into `raw/`, then:
+The whole pipeline is one command:
 
 ```bash
-npm run silhouette -- --in raw/edelman.mp4 --day 1 --start 12 --duration 8 \
-  --keep "#002244"          # optional: jersey color → neon-red highlight
+npm run silhouette -- \
+  --in raw/edelman.mp4 \
+  --day 6 --start 12 --duration 8 --keep "#002244" \
+  --upload --date 2026-05-15 \
+  --title "Helmet Catch" --player "David Tyree" \
+  --aliases "tyree,david tyree" --team "New York Giants" \
+  --position "WR" --jersey 85 \
+  --description "Super Bowl XLII…" --funFact "…"
 ```
 
-That outputs `public/videos/day-01.mp4` + `public/posters/day-01.jpg`. Full guide and tuning options in [SILHOUETTE.md](./SILHOUETTE.md).
+That:
 
-**Path B — hand-deliver the MP4.** Export your own 9:16 silhouette MP4 (≤ 10s, muted-friendly) and drop it into `public/videos/day-06.mp4` directly.
+1. Encodes the source clip to a 720×1280 silhouette MP4 (with the player isolated in neon red).
+2. Extracts a first-frame poster JPG.
+3. Uploads both files to Supabase Storage (`picks-daily` bucket).
+4. Upserts a `public.pd_challenges` row with the right publish date.
 
-Either way, append a new entry to `CHALLENGES` in [`src/lib/challenges.ts`](./src/lib/challenges.ts):
+The site picks it up automatically at the next page revalidation (~60s) — no redeploy needed.
 
-```ts
-{
-  id: "day-06",
-  date: "2026-05-15",
-  title: "Helmet Catch",
-  player: "David Tyree",
-  aliases: ["tyree", "david tyree"],
-  team: "New York Giants",
-  videoUrl: "/videos/day-06.mp4",
-  posterUrl: "/posters/day-06.jpg",
-  description: "Super Bowl XLII...",
-  funFact: "It was the second-to-last catch of his NFL career.",
-}
-```
+Full options and three highlight modes in [SILHOUETTE.md](./SILHOUETTE.md).
 
-The `Today` page automatically shows the entry whose `date` matches today (in the user's local timezone), and falls back to the most recent past entry otherwise.
+### Where the videos & data live
+
+| What | Where |
+|---|---|
+| Challenge metadata | Supabase Postgres → `public.pd_challenges` |
+| Silhouette MP4s + posters | Supabase Storage → `picks-daily` bucket (public read) |
+| User streaks & results | `localStorage` on the user's device (no backend) |
+
+The DB row knows the public URL of the file in Storage, so the app fetches a single row and the `<video>` tag streams from Supabase's CDN. Edit titles / fun facts / aliases in the dashboard without a code push.
+
+The `Today` page automatically shows the row with the most recent `publish_date <= current_date` (RLS hides future rows from the public anon key), so you can schedule weeks of content in advance.
 
 ## Game rules
 

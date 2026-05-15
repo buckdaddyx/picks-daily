@@ -20,12 +20,15 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
+
+// Load .env.local for SUPABASE_* vars used by --upload.
+loadDotenv(resolve(ROOT, ".env.local"));
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -83,10 +86,16 @@ await runFfmpeg([
   POSTER_OUT,
 ]);
 
-console.log("\n✓ Done.");
+console.log("\n✓ ffmpeg done.");
 console.log(`  video:  ${relativeToRoot(VIDEO_OUT)}`);
-console.log(`  poster: ${relativeToRoot(POSTER_OUT)}\n`);
-console.log("Now add the entry to src/lib/challenges.ts and you're live.");
+console.log(`  poster: ${relativeToRoot(POSTER_OUT)}`);
+
+if (args.upload) {
+  await uploadToSupabase({ day, args, videoPath: VIDEO_OUT, posterPath: POSTER_OUT });
+} else {
+  console.log("\nSkip --upload? Drop these files into Supabase Storage manually,");
+  console.log("or insert a pd_challenges row pointing at /videos/day-XX.mp4.");
+}
 
 // ---------- helpers ----------
 
@@ -205,13 +214,107 @@ Options:
   --tolerance <0..1>   Color match tolerance for --keep (default 0.18)
   --blend <0..1>       Color edge blend for --keep (default 0.05)
   --mask <path>        Mask video/image (red pixels = highlight)
+  --upload             After encoding, push to Supabase Storage + upsert
+                       the pd_challenges row. Requires the env vars below.
+  --date <YYYY-MM-DD>  Publish date for the challenge row (with --upload)
+  --title <str>        Challenge title (with --upload)
+  --player <str>       Canonical player name (with --upload)
+  --aliases <a,b,c>    Comma-separated aliases (with --upload)
+  --team <str>         Team (with --upload)
+  --position <str>     Position abbreviation (with --upload)
+  --jersey <n>         Jersey number (with --upload)
+  --description <str>  Play description (with --upload)
+  --funFact <str>      Fun fact (with --upload)
   --help               Show this message
 
 Modes:
   plain   omit both --keep and --mask → straight B&W silhouette
   keep    --keep "#RRGGBB"           → keeps jersey color, paints it neon red
   mask    --mask raw/foo.mov          → composites supplied red mask on B&W
+
+Env vars (for --upload, in .env.local):
+  NEXT_PUBLIC_SUPABASE_URL
+  SUPABASE_SERVICE_ROLE_KEY
 `);
+}
+
+async function uploadToSupabase({ day, args, videoPath, posterPath }) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    die("--upload requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local");
+  }
+  if (!args.date) die("--upload requires --date YYYY-MM-DD");
+  if (!args.title) die("--upload requires --title");
+  if (!args.player) die("--upload requires --player");
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
+
+  const id = `day-${day}`;
+  const videoKey = `videos/${id}.mp4`;
+  const posterKey = `posters/${id}.jpg`;
+
+  console.log("\n→ Uploading to Supabase…");
+  await uploadFile(sb, videoKey, videoPath, "video/mp4");
+  console.log(`  ✓ storage: ${videoKey}`);
+  await uploadFile(sb, posterKey, posterPath, "image/jpeg");
+  console.log(`  ✓ storage: ${posterKey}`);
+
+  const videoUrl = sb.storage.from("picks-daily").getPublicUrl(videoKey).data.publicUrl;
+  const posterUrl = sb.storage.from("picks-daily").getPublicUrl(posterKey).data.publicUrl;
+
+  const aliases = args.aliases
+    ? String(args.aliases).split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const row = {
+    id,
+    publish_date: args.date,
+    title: args.title,
+    player: args.player,
+    aliases,
+    team: args.team ?? null,
+    position: args.position ?? null,
+    jersey: args.jersey ? Number(args.jersey) : null,
+    video_url: videoUrl,
+    poster_url: posterUrl,
+    description: args.description ?? null,
+    fun_fact: args.funFact ?? null,
+    is_published: true,
+  };
+
+  const { error } = await sb
+    .from("pd_challenges")
+    .upsert(row, { onConflict: "id" });
+  if (error) die(`Upsert failed: ${error.message}`);
+  console.log(`  ✓ db row upserted: ${id} (publishes ${args.date})`);
+  console.log(`\n🎉 Live at the next site rebuild — or instantly if revalidate hits.`);
+}
+
+async function uploadFile(sb, key, path, contentType) {
+  const buf = readFileSync(path);
+  const { error } = await sb.storage
+    .from("picks-daily")
+    .upload(key, buf, { contentType, upsert: true });
+  if (error) die(`Storage upload failed for ${key}: ${error.message}`);
+}
+
+function loadDotenv(path) {
+  if (!existsSync(path)) return;
+  const content = readFileSync(path, "utf8");
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const k = trimmed.slice(0, eq).trim();
+    let v = trimmed.slice(eq + 1).trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
+    }
+    if (!(k in process.env)) process.env[k] = v;
+  }
 }
 
 function die(msg) {

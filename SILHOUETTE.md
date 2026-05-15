@@ -1,6 +1,6 @@
 # Silhouette Video Pipeline
 
-How to turn any NFL highlight clip into a Picks Daily silhouette video.
+How to turn any NFL highlight clip into a Picks Daily silhouette video — and (optionally) publish it directly to Supabase in one command.
 
 ## Prereqs
 
@@ -8,22 +8,49 @@ How to turn any NFL highlight clip into a Picks Daily silhouette video.
 brew install ffmpeg          # one-time
 ```
 
-## Quick start
+For the `--upload` flag, also set the following in `.env.local`:
 
-1. Drop the source clip into `raw/` (e.g. `raw/edelman.mp4`). It can be any format ffmpeg understands.
-2. Pick the best 6–10 second window. Note the start time in seconds.
-3. Run the script:
-
-```bash
-npm run silhouette -- --in raw/edelman.mp4 --day 1 --start 12 --duration 8
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...     # Supabase dashboard → Settings → API
 ```
 
-That writes:
+## Quick start (upload + publish in one command)
 
-- `public/videos/day-01.mp4` — 720×1280 H.264, no audio, fast-start
-- `public/posters/day-01.jpg` — first-frame thumbnail used in the archive grid
+```bash
+npm run silhouette -- \
+  --in raw/edelman.mp4 \
+  --day 6 \
+  --start 12 --duration 8 \
+  --keep "#002244" \
+  --upload \
+  --date 2026-05-15 \
+  --title "Helmet Catch" \
+  --player "David Tyree" \
+  --aliases "tyree,david tyree" \
+  --team "New York Giants" \
+  --position "WR" \
+  --jersey 85 \
+  --description "Super Bowl XLII. He pinned the ball to his helmet against Rodney Harrison to extend the drive that ended the Patriots' perfect season." \
+  --funFact "It was the second-to-last catch of his NFL career."
+```
 
-Then add the matching entry to [`src/lib/challenges.ts`](src/lib/challenges.ts) and you're live.
+That runs ffmpeg, uploads the MP4 + poster to Supabase Storage (`picks-daily` bucket), and upserts a row in `public.pd_challenges` with the right publish date. The site picks it up at the next page revalidation (~60s) — no redeploy required.
+
+## Local-only (no upload)
+
+If you just want the encoded files and want to publish manually later:
+
+```bash
+npm run silhouette -- --in raw/edelman.mp4 --day 6 --start 12 --duration 8
+```
+
+Outputs:
+
+- `public/videos/day-06.mp4` — 720×1280 H.264, no audio, fast-start
+- `public/posters/day-06.jpg` — first-frame thumbnail
+
+You can either drag those into the Supabase Storage UI, or re-run with `--upload` once the metadata is finalized.
 
 ## The three modes
 

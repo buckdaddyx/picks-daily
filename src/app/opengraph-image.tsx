@@ -2,13 +2,16 @@ import { ImageResponse } from "next/og";
 import { getTodaysChallenge } from "@/lib/challenges";
 import { formatLongDate } from "@/lib/utils";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const alt = "Picks Daily — Guess the NFL Player";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
-  const c = getTodaysChallenge();
+export default async function OpengraphImage() {
+  const c = (await getTodaysChallenge()) ?? {
+    date: new Date().toISOString().slice(0, 10),
+    title: "A new silhouette every day",
+  };
 
   return new ImageResponse(
     (
