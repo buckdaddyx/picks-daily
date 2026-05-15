@@ -8,6 +8,10 @@ export type Challenge = {
   /** Other accepted aliases (last names, common spellings, etc.) */
   aliases?: string[];
   team: string;
+  /** Position abbreviation, e.g. "WR", "RB", "DE". Used by the hint system. */
+  position?: string;
+  /** Jersey number, used by the hint system. */
+  jersey?: number;
   videoUrl: string;
   /** Static silhouette frame used in archive cards / loading state. */
   posterUrl?: string;
@@ -31,6 +35,8 @@ export const CHALLENGES: Challenge[] = [
     player: "Julian Edelman",
     aliases: ["edelman", "julian edelman", "jules"],
     team: "New England Patriots",
+    position: "WR",
+    jersey: 11,
     videoUrl: "/videos/day-01.mp4",
     posterUrl: "/posters/day-01.jpg",
     description:
@@ -45,6 +51,8 @@ export const CHALLENGES: Challenge[] = [
     player: "Cooper DeJean",
     aliases: ["dejean", "cooper dejean", "quinyon dejean"],
     team: "Philadelphia Eagles",
+    position: "CB",
+    jersey: 33,
     videoUrl: "/videos/day-02.mp4",
     posterUrl: "/posters/day-02.jpg",
     description:
@@ -59,6 +67,8 @@ export const CHALLENGES: Challenge[] = [
     player: "Dez Bryant",
     aliases: ["dez", "dez bryant", "bryant"],
     team: "Dallas Cowboys",
+    position: "WR",
+    jersey: 88,
     videoUrl: "/videos/day-03.mp4",
     posterUrl: "/posters/day-03.jpg",
     description:
@@ -73,6 +83,8 @@ export const CHALLENGES: Challenge[] = [
     player: "Ezekiel Elliott",
     aliases: ["zeke", "ezekiel elliott", "elliott"],
     team: "Dallas Cowboys",
+    position: "RB",
+    jersey: 21,
     videoUrl: "/videos/day-04.mp4",
     posterUrl: "/posters/day-04.jpg",
     description:
@@ -87,6 +99,8 @@ export const CHALLENGES: Challenge[] = [
     player: "Brandon Graham",
     aliases: ["graham", "brandon graham", "bg"],
     team: "Philadelphia Eagles",
+    position: "DE",
+    jersey: 55,
     videoUrl: "/videos/day-05.mp4",
     posterUrl: "/posters/day-05.jpg",
     description:

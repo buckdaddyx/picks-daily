@@ -5,6 +5,7 @@ import { Check, X, Share2, CalendarDays, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Countdown } from "@/components/countdown";
 import { cn, formatLongDate } from "@/lib/utils";
 import type { Challenge } from "@/lib/challenges";
 import type { Result } from "@/lib/storage";
@@ -95,6 +96,8 @@ export function ResultCard({ challenge, result }: Props) {
           You guessed: <span className="font-semibold text-foreground">{result.guess}</span>
         </p>
       )}
+
+      <Countdown className="mt-4" />
     </motion.div>
   );
 }

@@ -26,3 +26,20 @@ export function formatLongDate(iso: string): string {
     year: "numeric",
   });
 }
+
+/** Milliseconds until the next local midnight. */
+export function msUntilNextDay(now: Date = new Date()): number {
+  const tomorrow = new Date(now);
+  tomorrow.setHours(24, 0, 0, 0);
+  return tomorrow.getTime() - now.getTime();
+}
+
+/** Format a millisecond delta as "Hh Mm Ss" (with leading-zero seconds). */
+export function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0h 0m 0s";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h}h ${m}m ${String(s).padStart(2, "0")}s`;
+}

@@ -4,12 +4,19 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Flame, HelpCircle } from "lucide-react";
 import { useResults, computeStreak } from "@/lib/storage";
+import { useFirstVisit } from "@/lib/hooks";
 import { HowToPlayDialog } from "@/components/how-to-play-dialog";
 
 export function TopBar() {
   const { results } = useResults();
   const streak = useMemo(() => computeStreak(results), [results]);
   const [howOpen, setHowOpen] = useState(false);
+  const { isFirstVisit, markSeen } = useFirstVisit();
+  const open = howOpen || isFirstVisit;
+  const setOpen = (v: boolean) => {
+    if (!v && isFirstVisit) markSeen();
+    setHowOpen(v);
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -49,7 +56,7 @@ export function TopBar() {
           </button>
         </div>
       </div>
-      <HowToPlayDialog open={howOpen} onOpenChange={setHowOpen} />
+      <HowToPlayDialog open={open} onOpenChange={setOpen} />
     </header>
   );
 }

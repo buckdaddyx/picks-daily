@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { GuessForm } from "@/components/guess-form";
 import { ResultCard } from "@/components/result-card";
 import { SilhouettePlayer } from "@/components/silhouette-player";
+import { HintStrip } from "@/components/hint-strip";
 import { getTodaysChallenge } from "@/lib/challenges";
 import { isCorrectGuess } from "@/lib/match";
 import { useResults, type Result } from "@/lib/storage";
@@ -120,19 +121,22 @@ export default function TodayPage() {
       </motion.div>
 
       {!locked ? (
-        <GuessForm
-          onSubmit={handleGuess}
-          attempts={attempts}
-          shake={shake}
-        />
+        <>
+          <HintStrip challenge={challenge} attempts={attempts} />
+          <GuessForm
+            onSubmit={handleGuess}
+            attempts={attempts}
+            shake={shake}
+          />
+          {attempts > 0 && (
+            <p className="text-center text-xs text-muted-foreground">
+              {MAX_ATTEMPTS - attempts}{" "}
+              {MAX_ATTEMPTS - attempts === 1 ? "guess" : "guesses"} left
+            </p>
+          )}
+        </>
       ) : (
         <ResultCard challenge={challenge} result={stored!} />
-      )}
-
-      {!locked && attempts > 0 && (
-        <p className="text-center text-xs text-muted-foreground">
-          {MAX_ATTEMPTS - attempts} {MAX_ATTEMPTS - attempts === 1 ? "guess" : "guesses"} left
-        </p>
       )}
     </div>
   );

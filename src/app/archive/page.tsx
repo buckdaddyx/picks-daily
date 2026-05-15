@@ -30,7 +30,7 @@ export default function ArchivePage() {
         </Badge>
         <h1 className="font-display text-2xl tracking-tight">All-Time Picks</h1>
         <p className="text-xs text-muted-foreground">
-          Replay any past day. Yellow = locked, until its release date.
+          Replay any past day. Locked cards unlock on their release date.
         </p>
       </header>
 
