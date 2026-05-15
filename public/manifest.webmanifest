@@ -1,0 +1,13 @@
+{
+  "name": "Picks Daily",
+  "short_name": "Picks",
+  "description": "A new silhouetted NFL play every day. Guess the player.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

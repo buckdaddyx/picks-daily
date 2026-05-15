@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# raw source clips for the silhouette pipeline (often huge, locally-only)
+/raw/
+!/raw/.gitkeep
