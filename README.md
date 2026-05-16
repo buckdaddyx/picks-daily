@@ -30,27 +30,30 @@ Open <http://localhost:3000> on your phone (or Chrome devtools mobile view).
 ```
 src/
   app/
-    page.tsx              # Today / home — video + guess flow
-    archive/page.tsx      # Past days grid + replay modal
-    stats/page.tsx        # Streak, win rate, distribution
-    layout.tsx            # Top bar + bottom nav shell
-    globals.css           # Theme tokens
+    page.tsx                  # Today / home — video + guess flow
+    archive/page.tsx          # Past days grid + replay modal
+    stats/page.tsx            # Streak, win rate, distribution
+    admin/page.tsx            # Visual upload tool (dev-only)
+    admin/api/publish/route.ts# POST handler — runs ffmpeg + uploads to Supabase
+    layout.tsx                # Top bar + bottom nav shell
+    globals.css               # Theme tokens
   components/
-    silhouette-player.tsx # 9:16 vertical player with custom controls
-    guess-form.tsx        # Input + submit + shake on wrong guess
-    result-card.tsx       # Reveal name, fun fact, share button
-    top-bar.tsx           # Logo, streak counter, how-to-play
-    bottom-nav.tsx        # Today | Archive | Stats
-    how-to-play-dialog.tsx
-    ui/                   # button, input, dialog, badge primitives
+    silhouette-player.tsx     # 9:16 vertical player with custom controls
+    guess-form.tsx            # Input + submit + shake on wrong guess
+    result-card.tsx           # Reveal name, fun fact, share button
+    top-bar.tsx               # Logo, streak counter, how-to-play
+    bottom-nav.tsx            # Today | Archive | Stats
+    admin-upload-form.tsx     # Drag-drop + form for /admin
+    ui/                       # button, input, dialog, badge, textarea, select
   lib/
-    challenges.ts         # Seed data — add new days here
-    match.ts              # Fuzzy guess matching (last name, aliases, typos)
-    storage.ts            # useResults() hook + streak/stats helpers
-    utils.ts              # cn(), date formatters
+    challenges.ts             # Supabase data layer (server-only)
+    supabase.ts               # Anon-key client
+    teams.ts                  # NFL primary colors + position list
+    match.ts                  # Fuzzy guess matching (last name, aliases, typos)
+    storage.ts                # useResults() hook + streak/stats helpers
+    utils.ts                  # cn(), date formatters, countdown
+  proxy.ts                    # Hides /admin/* in production
 public/
-  videos/                 # Drop day-XX.mp4 silhouette clips here
-  posters/                # Optional static frame thumbnails
   favicon.svg
   manifest.webmanifest
 ```
@@ -80,6 +83,18 @@ That:
 The site picks it up automatically at the next page revalidation (~60s) — no redeploy needed.
 
 Full options and three highlight modes in [SILHOUETTE.md](./SILHOUETTE.md).
+
+### Or: use the visual admin tool
+
+Don't want to remember the CLI? Run `npm run dev` and open [`http://localhost:3000/admin`](http://localhost:3000/admin):
+
+- Drag-drop a source MP4
+- Pick the team (autofills the keep-color hex)
+- Tweak start / duration / tolerance
+- Fill in metadata (title, player, aliases, position, jersey, description, fun fact)
+- Hit **Encode & Publish** — runs the same pipeline above and shows the live links
+
+The route 404s in production by design (it shells out to a local `ffmpeg` binary that doesn't exist on Vercel Functions), so it's safe to ship. To enable on a self-hosted Node server, set `ADMIN_ENABLE=1` and put the route behind your own auth.
 
 ### Where the videos & data live
 

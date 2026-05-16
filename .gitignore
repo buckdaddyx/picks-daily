@@ -43,3 +43,10 @@ next-env.d.ts
 # raw source clips for the silhouette pipeline (often huge, locally-only)
 /raw/
 !/raw/.gitkeep
+
+# silhouette pipeline writes locally before pushing to Supabase Storage.
+# Treat these as build artifacts; the live versions live in Supabase.
+/public/videos/*.mp4
+/public/posters/*.jpg
+!/public/videos/.gitkeep
+!/public/posters/.gitkeep
