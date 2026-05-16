@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Loader2,
   ExternalLink,
+  Link2,
+  HardDrive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import { TEAM_COLORS, POSITIONS } from "@/lib/teams";
 import { cn } from "@/lib/utils";
 
 type Mode = "plain" | "keep";
+type SourceMode = "file" | "url";
 
 type PublishResult =
   | { status: "idle" }
@@ -31,7 +34,9 @@ type PublishResult =
   | { status: "error"; message: string };
 
 export function AdminUploadForm() {
+  const [sourceMode, setSourceMode] = useState<SourceMode>("url");
   const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,8 +81,19 @@ export function AdminUploadForm() {
   };
 
   const submit = async () => {
-    if (!file) {
+    if (sourceMode === "file" && !file) {
       setResult({ status: "error", message: "Pick a source video first." });
+      return;
+    }
+    if (sourceMode === "url" && !url.trim()) {
+      setResult({ status: "error", message: "Paste a video URL first." });
+      return;
+    }
+    if (sourceMode === "url" && !/^https?:\/\//i.test(url.trim())) {
+      setResult({
+        status: "error",
+        message: "URL must start with http:// or https://",
+      });
       return;
     }
     if (!day || !date || !title || !player) {
@@ -91,7 +107,11 @@ export function AdminUploadForm() {
     setResult({ status: "uploading", pct: 0 });
 
     const fd = new FormData();
-    fd.append("file", file);
+    if (sourceMode === "file" && file) {
+      fd.append("file", file);
+    } else {
+      fd.append("url", url.trim());
+    }
     fd.append("mode", mode);
     if (mode === "keep") {
       fd.append("keep", keepHex);
@@ -148,53 +168,87 @@ export function AdminUploadForm() {
         </p>
       </header>
 
-      {/* Section 1: Source file */}
+      {/* Section 1: Source */}
       <Section icon={<Film className="h-4 w-4" />} title="Source clip">
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            handleFileSelect(e.dataTransfer.files[0] ?? null);
-          }}
-          onClick={() => fileInputRef.current?.click()}
-          className={cn(
-            "flex h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/30 px-4 text-center transition-colors",
-            dragOver && "border-accent bg-accent/10",
-            file && "border-success/50 bg-success/5",
-          )}
-        >
-          {file ? (
-            <>
-              <CheckCircle2 className="h-6 w-6 text-success" />
-              <div className="text-sm font-semibold">{file.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {(file.size / 1024 / 1024).toFixed(1)} MB · click to swap
-              </div>
-            </>
-          ) : (
-            <>
-              <Upload className="h-6 w-6 text-muted-foreground" />
-              <div className="text-sm font-semibold">
-                Drag a video, or click to browse
-              </div>
-              <div className="text-xs text-muted-foreground">
-                MP4 / MOV / WebM — anything ffmpeg can read
-              </div>
-            </>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+        <div className="inline-flex w-full rounded-xl border border-border bg-muted/40 p-1 text-xs font-semibold">
+          <SourceTab
+            active={sourceMode === "url"}
+            onClick={() => setSourceMode("url")}
+            icon={<Link2 className="h-3.5 w-3.5" />}
+            label="Paste URL"
+          />
+          <SourceTab
+            active={sourceMode === "file"}
+            onClick={() => setSourceMode("file")}
+            icon={<HardDrive className="h-3.5 w-3.5" />}
+            label="Upload file"
           />
         </div>
+
+        {sourceMode === "url" ? (
+          <div className="flex flex-col gap-2">
+            <Input
+              type="url"
+              placeholder="https://youtube.com/watch?v=…  or  https://x.com/…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Works with YouTube, Reddit, X/Twitter, TikTok, NFL.com — anything{" "}
+              <span className="font-mono text-foreground">yt-dlp</span> can
+              read. Server downloads it, trims to the start/duration below.
+            </p>
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              handleFileSelect(e.dataTransfer.files[0] ?? null);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "flex h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/30 px-4 text-center transition-colors",
+              dragOver && "border-accent bg-accent/10",
+              file && "border-success/50 bg-success/5",
+            )}
+          >
+            {file ? (
+              <>
+                <CheckCircle2 className="h-6 w-6 text-success" />
+                <div className="text-sm font-semibold">{file.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {(file.size / 1024 / 1024).toFixed(1)} MB · click to swap
+                </div>
+              </>
+            ) : (
+              <>
+                <Upload className="h-6 w-6 text-muted-foreground" />
+                <div className="text-sm font-semibold">
+                  Drag a video, or click to browse
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  MP4 / MOV / WebM — anything ffmpeg can read
+                </div>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+            />
+          </div>
+        )}
       </Section>
 
       {/* Section 2: Encoding */}
@@ -386,7 +440,14 @@ export function AdminUploadForm() {
           />
         )}
         {result.status === "processing" && (
-          <StatusBar label="Encoding silhouette + uploading to Supabase…" pulse />
+          <StatusBar
+            label={
+              sourceMode === "url"
+                ? "Downloading source + encoding + uploading to Supabase…"
+                : "Encoding silhouette + uploading to Supabase…"
+            }
+            pulse
+          />
         )}
         {result.status === "success" && (
           <SuccessCard result={result} />
@@ -435,6 +496,34 @@ function Section({
       </h2>
       {children}
     </section>
+  );
+}
+
+function SourceTab({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 transition-colors",
+        active
+          ? "bg-accent/15 text-accent ring-1 ring-accent/40"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

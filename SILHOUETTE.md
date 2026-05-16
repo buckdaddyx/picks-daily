@@ -5,7 +5,8 @@ How to turn any NFL highlight clip into a Picks Daily silhouette video — and (
 ## Prereqs
 
 ```bash
-brew install ffmpeg          # one-time
+brew install ffmpeg          # one-time, required
+brew install yt-dlp          # one-time, only if you use --url
 ```
 
 For the `--upload` flag, also set the following in `.env.local`:
@@ -17,12 +18,14 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...     # Supabase dashboard → Settings �
 
 ## Quick start (upload + publish in one command)
 
+### From a URL (no manual download)
+
 ```bash
 npm run silhouette -- \
-  --in raw/edelman.mp4 \
+  --url "https://www.youtube.com/watch?v=XXXXXXXXXXX" \
   --day 6 \
-  --start 12 --duration 8 \
-  --keep "#002244" \
+  --start 754 --duration 8 \
+  --keep "#0B2265" \
   --upload \
   --date 2026-05-15 \
   --title "Helmet Catch" \
@@ -35,7 +38,22 @@ npm run silhouette -- \
   --funFact "It was the second-to-last catch of his NFL career."
 ```
 
-That runs ffmpeg, uploads the MP4 + poster to Supabase Storage (`picks-daily` bucket), and upserts a row in `public.pd_challenges` with the right publish date. The site picks it up at the next page revalidation (~60s) — no redeploy required.
+Works with anything `yt-dlp` reads: YouTube, Reddit (`v.redd.it`), X/Twitter, TikTok, NFL.com, Instagram. `--start` is the second-offset where the play begins (e.g. `754` = 12:34 into a compilation), so one "Top 100 plays" video can stock weeks of picks.
+
+### From a local file
+
+```bash
+npm run silhouette -- \
+  --in raw/edelman.mp4 \
+  --day 6 \
+  --start 12 --duration 8 \
+  --keep "#0B2265" \
+  --upload --date 2026-05-15 \
+  --title "Helmet Catch" --player "David Tyree" \
+  # ... same metadata flags as above ...
+```
+
+Both modes run ffmpeg, upload the MP4 + poster to Supabase Storage (`picks-daily` bucket), and upsert a row in `public.pd_challenges` with the right publish date. The site picks it up at the next page revalidation (~60s) — no redeploy required.
 
 ## Local-only (no upload)
 
@@ -137,6 +155,8 @@ done
 | Symptom                                    | Fix                                                                    |
 |--------------------------------------------|------------------------------------------------------------------------|
 | `ffmpeg not found`                         | `brew install ffmpeg`                                                  |
+| `yt-dlp not found` (when using `--url`)    | `brew install yt-dlp`                                                  |
+| `yt-dlp exited with code 1`                | URL is private/age-gated/region-locked. Try a different mirror, or download manually and pass `--in`. |
 | Output is just black                       | Source has no pixels matching `--keep`. Try wider `--tolerance` or use `plain`/`mask`. |
 | Highlight is jittery / flashy              | Lower `--tolerance` and add a small `--blend` value.                   |
 | Output is too dark / contrasty             | Pre-grade the source clip in `raw/` or edit the `eq=` filter in `silhouette.mjs`. |

@@ -60,12 +60,16 @@ public/
 
 ## Adding a new daily play
 
-The whole pipeline is one command:
+You don't need a content team. Source clips are free everywhere — YouTube (`@NFL`, `@NFLFilms`, `@NFLThrowback`), Reddit (`r/nfl`), X, TikTok, NFL.com. The pipeline does the encoding + upload in one command, so the daily cost is ~2 minutes per pick.
+
+### From a URL (smoothest — no manual download)
+
+Install [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) once: `brew install yt-dlp`.
 
 ```bash
 npm run silhouette -- \
-  --in raw/edelman.mp4 \
-  --day 6 --start 12 --duration 8 --keep "#002244" \
+  --url "https://www.youtube.com/watch?v=XXXXXXXXXXX" \
+  --day 6 --start 754 --duration 8 --keep "#0B2265" \
   --upload --date 2026-05-15 \
   --title "Helmet Catch" --player "David Tyree" \
   --aliases "tyree,david tyree" --team "New York Giants" \
@@ -73,16 +77,33 @@ npm run silhouette -- \
   --description "Super Bowl XLII…" --funFact "…"
 ```
 
-That:
+`--start` is the second-offset into the source video where the play begins (e.g. `754` = 12:34 into a compilation). One "Top 100 plays of all time" compilation buys you a month of picks — note the timestamp for each play and run the command N times.
 
-1. Encodes the source clip to a 720×1280 silhouette MP4 (with the player isolated in neon red).
-2. Extracts a first-frame poster JPG.
-3. Uploads both files to Supabase Storage (`picks-daily` bucket).
-4. Upserts a `public.pd_challenges` row with the right publish date.
+### From a local file
+
+If you already downloaded the clip:
+
+```bash
+npm run silhouette -- --in raw/edelman.mp4 --day 6  ... (same flags as above)
+```
+
+### Or: visual admin tool — no CLI
+
+Run `npm run dev`, open [`/admin`](http://localhost:3000/admin), pick the **Paste URL** tab, drop a YouTube/Reddit/X link, fill in the metadata, hit **Encode & Publish**. The route 404s in production by design (it shells out to local `ffmpeg` + `yt-dlp`), so it's safe to ship. Override with `ADMIN_ENABLE=1` if hosting behind your own auth.
+
+### What happens under the hood
+
+1. (URL mode) Downloads via `yt-dlp` to a temp dir
+2. Encodes to a 720×1280 silhouette MP4 with the chosen jersey color re-tinted neon red
+3. Extracts a first-frame poster JPG
+4. Uploads both files to Supabase Storage (`picks-daily` bucket)
+5. Upserts a `public.pd_challenges` row with the right publish date
 
 The site picks it up automatically at the next page revalidation (~60s) — no redeploy needed.
 
 Full options and three highlight modes in [SILHOUETTE.md](./SILHOUETTE.md).
+
+> **On sources:** the silhouette is a heavy transformation (B&W + recolored, ~8s of a 3-hour broadcast, functional puzzle context). Different fair-use posture than a direct rebroadcast. Not legal advice — use the pipeline, never raw clips.
 
 ### Or: use the visual admin tool
 

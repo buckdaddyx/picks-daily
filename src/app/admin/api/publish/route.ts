@@ -29,8 +29,14 @@ export async function POST(req: NextRequest) {
   }
 
   const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return err("Missing source file");
+  const urlSource = String(form.get("url") ?? "").trim();
+  const hasFile = file instanceof File && file.size > 0;
+  const hasUrl = !!urlSource;
+  if (!hasFile && !hasUrl) {
+    return err("Provide either a source file or a URL");
+  }
+  if (hasUrl && !/^https?:\/\//i.test(urlSource)) {
+    return err("URL must start with http:// or https://");
   }
 
   const day = String(form.get("day") ?? "").trim();
@@ -50,17 +56,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Persist the upload to a temp file the CLI can read.
+  // For file uploads: persist to a temp file the CLI can read.
+  // For URL mode: let the CLI's --url handler download via yt-dlp itself.
   const workDir = join(tmpdir(), "picks-daily", randomUUID());
   await mkdir(workDir, { recursive: true });
-  const ext = inferExt(file.type, file.name);
-  const sourcePath = join(workDir, `source.${ext}`);
-  await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
+
+  let sourcePath: string | null = null;
+  if (hasFile) {
+    const ext = inferExt(file.type, file.name);
+    sourcePath = join(workDir, `source.${ext}`);
+    await writeFile(sourcePath, Buffer.from(await file.arrayBuffer()));
+  }
 
   // Build CLI args matching scripts/silhouette.mjs.
   const args: string[] = [
     SCRIPT,
-    "--in", sourcePath,
+    ...(sourcePath ? ["--in", sourcePath] : ["--url", urlSource]),
     "--day", day,
     "--start", String(form.get("start") ?? 0),
     "--duration", String(form.get("duration") ?? 8),
@@ -74,7 +85,7 @@ export async function POST(req: NextRequest) {
   if (mode === "keep") {
     const keep = String(form.get("keep") ?? "").trim();
     if (!keep) {
-      await cleanup(sourcePath);
+      if (sourcePath) await cleanup(sourcePath);
       return err("--keep mode requires a hex color");
     }
     args.push("--keep", keep);
@@ -93,8 +104,10 @@ export async function POST(req: NextRequest) {
   passOptional("description");
   passOptional("funFact", "funFact");
 
+  // yt-dlp can take a while on long YouTube videos. Bump the timeout
+  // generously; route handler's maxDuration above caps us at 120s.
   const cliResult = await runScript(args);
-  await cleanup(sourcePath);
+  if (sourcePath) await cleanup(sourcePath);
 
   if (cliResult.code !== 0) {
     return err(

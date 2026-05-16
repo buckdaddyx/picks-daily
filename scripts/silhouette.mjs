@@ -20,9 +20,11 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -32,13 +34,28 @@ loadDotenv(resolve(ROOT, ".env.local"));
 
 const args = parseArgs(process.argv.slice(2));
 
-if (args.help || !args.in || !args.day) {
+if (args.help || !args.day || (!args.in && !args.url)) {
   printUsage();
   process.exit(args.help ? 0 : 1);
 }
 
 const day = String(args.day).padStart(2, "0");
-const inPath = resolve(args.in);
+
+// Resolve the input — either a local file (--in) or a remote URL we download
+// with yt-dlp into a temp directory (--url). Both code paths converge on a
+// single `inPath` that the rest of the pipeline treats identically.
+let inPath;
+let cleanupTmp = null;
+if (args.url) {
+  const tmpDir = join(tmpdir(), "picks-daily-dl", randomUUID());
+  mkdirSync(tmpDir, { recursive: true });
+  inPath = await downloadWithYtDlp(args.url, tmpDir);
+  cleanupTmp = () => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  };
+} else {
+  inPath = resolve(args.in);
+}
 if (!existsSync(inPath)) die(`Input not found: ${inPath}`);
 
 const VIDEO_OUT = resolve(ROOT, "public/videos", `day-${day}.mp4`);
@@ -96,6 +113,8 @@ if (args.upload) {
   console.log("\nSkip --upload? Drop these files into Supabase Storage manually,");
   console.log("or insert a pd_challenges row pointing at /videos/day-XX.mp4.");
 }
+
+if (cleanupTmp) cleanupTmp();
 
 // ---------- helpers ----------
 
@@ -182,6 +201,44 @@ function runFfmpeg(ffmpegArgs) {
   });
 }
 
+async function downloadWithYtDlp(url, dir) {
+  console.log(`\n→ Downloading source via yt-dlp\n  url: ${url}\n`);
+  // Force a single MP4 (re-encode if necessary) so the rest of the pipeline
+  // doesn't have to think about container/codec variation across sites.
+  const out = join(dir, "source.%(ext)s");
+  await new Promise((resolveP, rejectP) => {
+    const child = spawn(
+      "yt-dlp",
+      [
+        "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+        "--no-playlist",
+        "--merge-output-format", "mp4",
+        "-o", out,
+        url,
+      ],
+      { stdio: "inherit" },
+    );
+    child.on("error", (err) =>
+      rejectP(
+        err.code === "ENOENT"
+          ? new Error(
+              "yt-dlp not found. Install with `brew install yt-dlp` (or pip install yt-dlp).",
+            )
+          : err,
+      ),
+    );
+    child.on("exit", (code) => {
+      if (code === 0) resolveP();
+      else rejectP(new Error(`yt-dlp exited with code ${code}`));
+    });
+  });
+  const downloaded = join(dir, "source.mp4");
+  if (!existsSync(downloaded)) {
+    die(`yt-dlp did not produce ${downloaded}`);
+  }
+  return downloaded;
+}
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
@@ -204,9 +261,14 @@ function parseArgs(argv) {
 function printUsage() {
   console.log(`
 Usage:
-  node scripts/silhouette.mjs --in <input.mp4> --day <N> [options]
+  node scripts/silhouette.mjs --in <input.mp4>  --day <N> [options]
+  node scripts/silhouette.mjs --url <video-url> --day <N> [options]
 
 Options:
+  --in <path>          Local source file
+  --url <url>          YouTube / Reddit / Twitter / etc URL — downloaded via
+                       yt-dlp into a temp dir, then encoded as if local.
+                       Requires \`yt-dlp\` on PATH (\`brew install yt-dlp\`).
   --start <sec>        Start offset into the source clip (default 0)
   --duration <sec>     Output length (default 8)
   --fps <n>            Output FPS (default 30)
